@@ -239,7 +239,7 @@ async function applyNegotiation(id: string, action: string, body: Record<string,
   const negotiation = (await query("SELECT * FROM negotiations WHERE id = $1", [id])).rows[0];
   if (!negotiation) throw new Error("Negotiation not found");
   const connected = Boolean(await getValidAccessToken().catch(() => null));
-  let remote = { simulated: true };
+  let remote: unknown = { simulated: true };
   if (connected && negotiation.trans_offer_id && !String(negotiation.trans_offer_id).startsWith("neg-") && !String(negotiation.trans_offer_id).startsWith("local-")) {
     const payload = {
       payment: body.price
