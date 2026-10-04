@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, rgba(227, 160, 8, 0.08), transparent 50%),
+    radial-gradient(900px 400px at 110% 0%, rgba(125, 206, 160, 0.06), transparent 45%),
+    #111410;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+input, select, textarea {
+  background: #141712;
+  border: 1px solid #32382c;
+  color: #efe8d6;
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 1px solid #e3a008;
+  border-color: #e3a008;
+}
+
+button {
+  font: inherit;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa392;
+  font-weight: 500;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid #32382c;
+}
+
+td {
+  padding: 0.7rem;
+  border-bottom: 1px solid #262b22;
+  vertical-align: top;
+}
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
