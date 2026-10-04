@@ -5,6 +5,9 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
+    if (res.status === 401 && path !== "/api/auth/login") {
+      window.dispatchEvent(new Event("desk-locked"));
+    }
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error || body.detail || res.statusText);
   }
@@ -18,6 +21,7 @@ export const api = {
   health: () => req("/api/health"),
   status: () => req<AuthStatus>("/api/auth/status"),
   login: (password: string) => req("/api/auth/login", { method: "POST", body: JSON.stringify({ password }) }),
+  logout: () => req("/api/auth/logout", { method: "POST" }),
   transStart: () => req<{ url: string }>("/api/auth/trans/start"),
   dashboard: () => req<Dashboard>("/api/dashboard"),
   feeds: () => req<Feed[]>("/api/feeds"),
@@ -49,6 +53,7 @@ export const api = {
 
 export type AuthStatus = {
   dashboard: boolean;
+  unlocked?: boolean;
   anthropic: boolean;
   trans: {
     configured: boolean;

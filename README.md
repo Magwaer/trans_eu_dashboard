@@ -126,34 +126,29 @@ Or: `npm run pm2:start` / `npm run pm2:restart` / `npm run pm2:logs`.
 
 ### 4. Nginx
 
+This server keeps every vhost in `/etc/nginx/nginx.conf` (`include /etc/nginx/conf.d/*.conf` is commented out; `sites-enabled` is not used). A file under `sites-available` will never load.
+
+Paste the two `server` blocks from `deploy/nginx/trans.tnlcrm.com.conf` into the `http { }` section, next to `v2.tnlcrm.com` and `lead.tnlcrm.com`. Without a `server_name trans.tnlcrm.com` block, nginx uses the first `:443` site (`v2.tnlcrm.com`).
+
 ```bash
-sudo cp /home/trans/deploy/nginx/trans.tnlcrm.com.conf /etc/nginx/sites-available/trans.tnlcrm.com
-sudo ln -sf /etc/nginx/sites-available/trans.tnlcrm.com /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Config file: `deploy/nginx/trans.tnlcrm.com.conf`. It listens on port 80 and proxies everything to `127.0.0.1:4000`.
+HTTPS uses the existing `tnlcrm.com` certificate at `/etc/letsencrypt/live/tnlcrm.com/` (same as v2/lead). HTTP redirects to HTTPS; `/` is proxied to `127.0.0.1:4000`.
 
 ### 5. Certbot (Let's Encrypt)
 
-HTTP site must already answer on port 80, and DNS must resolve.
-
-```bash
-sudo certbot --nginx -d trans.tnlcrm.com
-```
-
-Certbot installs the certificate, adds a `:443` server block, and redirects HTTP to HTTPS. Renewals are handled by the systemd timer:
+No extra cert is needed if `*.tnlcrm.com` is already covered by `/etc/letsencrypt/live/tnlcrm.com/`. Renewals stay on the existing certbot timer:
 
 ```bash
 sudo certbot renew --dry-run
 sudo systemctl status certbot.timer
 ```
 
-Manual renew (usually unnecessary):
+If that name is not on the cert, add it and reload:
 
 ```bash
-sudo certbot renew
+sudo certbot certonly --nginx -d tnlcrm.com -d v2.tnlcrm.com -d lead.tnlcrm.com -d trans.tnlcrm.com
 sudo systemctl reload nginx
 ```
 

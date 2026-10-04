@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
+import { api } from "./api";
+import LockScreen from "./LockScreen";
 import Command from "./pages/Command";
 import Feeds from "./pages/Feeds";
 import Inbox from "./pages/Inbox";
@@ -20,6 +23,24 @@ const links = [
 ];
 
 export default function App() {
+  const [ready, setReady] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+
+  useEffect(() => {
+    api
+      .status()
+      .then((s) => setUnlocked(Boolean(s.unlocked ?? s.dashboard)))
+      .catch(() => setUnlocked(false))
+      .finally(() => setReady(true));
+
+    const lock = () => setUnlocked(false);
+    window.addEventListener("desk-locked", lock);
+    return () => window.removeEventListener("desk-locked", lock);
+  }, []);
+
+  if (!ready) return null;
+  if (!unlocked) return <LockScreen onUnlock={() => setUnlocked(true)} />;
+
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr]">
       <aside className="border-r border-line bg-panel/80 px-5 py-6 flex flex-col">
@@ -46,6 +67,15 @@ export default function App() {
           Token 5 rps · API 15 rps
           <br />
           Callbacks from 52.208.90.151
+          <button
+            className="mt-4 block text-paper/70 hover:text-signal"
+            onClick={async () => {
+              await api.logout().catch(() => undefined);
+              setUnlocked(false);
+            }}
+          >
+            Lock desk
+          </button>
         </div>
       </aside>
       <main className="px-8 py-7 max-w-[1400px] w-full">

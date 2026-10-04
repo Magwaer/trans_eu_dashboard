@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { pool } from "./db/pool.js";
+import { requireDesk } from "./lib/deskAuth.js";
 import { authRouter } from "./routes/auth.js";
 import { apiRouter } from "./routes/api.js";
 import { webhookRouter } from "./routes/webhooks.js";
@@ -21,7 +22,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/webhooks", webhookRouter);
-app.use("/api", apiRouter);
+app.use("/api", requireDesk, apiRouter);
 
 const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/dist");
 app.use(express.static(clientDist));

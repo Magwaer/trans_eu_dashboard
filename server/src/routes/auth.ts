@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { config } from "../config.js";
 import { anthropicConfigured } from "../config.js";
+import { deskCookieOptions, isDeskUnlocked, requireDesk } from "../lib/deskAuth.js";
 import {
   buildAuthUrl,
   connectionStatus,
@@ -11,10 +12,27 @@ import {
 
 export const authRouter = Router();
 
-authRouter.get("/status", async (_req, res) => {
+authRouter.get("/status", async (req, res) => {
+  if (!isDeskUnlocked(req)) {
+    res.json({
+      dashboard: false,
+      unlocked: false,
+      anthropic: false,
+      trans: {
+        configured: false,
+        connected: false,
+        expiresAt: null,
+        scope: null,
+        notes: [],
+        rateLimits: { tokenRps: 5, apiRps: 15 },
+      },
+    });
+    return;
+  }
   const trans = await connectionStatus();
   res.json({
     dashboard: true,
+    unlocked: true,
     anthropic: anthropicConfigured(),
     trans,
   });
@@ -26,20 +44,16 @@ authRouter.post("/login", (req, res) => {
     res.status(401).json({ error: "Invalid password" });
     return;
   }
-  res.cookie("desk_session", config.sessionSecret, {
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: 14 * 86400000,
-  });
+  res.cookie("desk_session", config.sessionSecret, deskCookieOptions);
   res.json({ ok: true });
 });
 
 authRouter.post("/logout", (_req, res) => {
-  res.clearCookie("desk_session");
+  res.clearCookie("desk_session", { ...deskCookieOptions, maxAge: undefined });
   res.json({ ok: true });
 });
 
-authRouter.get("/trans/start", async (_req, res) => {
+authRouter.get("/trans/start", requireDesk, async (_req, res) => {
   try {
     const state = await createOauthState();
     res.json({ url: buildAuthUrl(state) });
