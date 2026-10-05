@@ -40,11 +40,39 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   return json;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function asItemList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) {
+    return payload.filter((item) => isRecord(item) && !("next_order" in item && !("id" in item))) as T[];
+  }
+  if (isRecord(payload)) {
+    for (const key of ["orders", "freights", "freight_proposals", "items", "data", "results"]) {
+      if (Array.isArray(payload[key])) return asItemList<T>(payload[key]);
+    }
+  }
+  return [];
+}
+
+function isNotFound(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return /page not found/i.test(message) || /not found/i.test(message);
+}
+
 async function paginate<T>(path: string, query: Query = {}, maxPages = 20): Promise<T[]> {
   const items: T[] = [];
   for (let page = 1; page <= maxPages; page += 1) {
-    const batch = await request<T[]>("GET", path, undefined, { ...query, page });
-    if (!Array.isArray(batch) || batch.length === 0) break;
+    let payload: unknown;
+    try {
+      payload = await request<unknown>("GET", path, undefined, { ...query, page });
+    } catch (err) {
+      if (page > 1 && isNotFound(err)) break;
+      throw err;
+    }
+    const batch = asItemList<T>(payload);
+    if (batch.length === 0) break;
     items.push(...batch);
     if (batch.length < 30) break;
   }
@@ -59,12 +87,12 @@ export const transEu = {
       filter,
     }),
   getAcceptedFreights: () =>
-    paginate("/ext/freights-api/v1/freights/accepted", { sortBy: "created_at", order: "desc" }),
+    paginate("/ext/freights-api/v1/accepted", { sortBy: "created_at", order: "desc" }),
   getArchivedFreights: () =>
-    paginate("/ext/freights-api/v1/freights/archived", { sortBy: "created_at", order: "desc" }),
+    paginate("/ext/freights-api/v1/archive", { sortBy: "created_at", order: "desc" }),
   getFreight: (id: string | number) => request("GET", `/ext/freights-api/v1/freights/${id}`),
-  getOffers: (freightId: string | number) =>
-    request<unknown[]>("GET", `/ext/freights-api/v1/freights/${freightId}/offers`),
+  getOffers: async (freightId: string | number) =>
+    asItemList(await request("GET", `/ext/freights-api/v1/freights/${freightId}/offers`)),
   getOffer: (offerId: string) => request("GET", `/ext/freights-api/v1/freights/offers/${offerId}`),
   getProposals: () =>
     paginate("/ext/freights-api/v2/freight-proposals", { sortBy: "loading_date", order: "desc" }),
@@ -86,6 +114,6 @@ export const transEu = {
     paginate("/ext/orders-api/v1/orders-created", { filter }),
   getReceivedOrders: (filter?: string) =>
     paginate("/ext/orders-api/v1/orders-received", { filter }),
-  getArchivedCreatedOrders: () => paginate("/ext/orders-api/v1/orders-created/archived"),
-  getArchivedReceivedOrders: () => paginate("/ext/orders-api/v1/orders-received/archived"),
+  getArchivedCreatedOrders: () => paginate("/ext/orders-api/v1/archive-orders-created"),
+  getArchivedReceivedOrders: () => paginate("/ext/orders-api/v1/archive-orders-received"),
 };

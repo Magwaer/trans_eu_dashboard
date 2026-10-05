@@ -90,54 +90,81 @@ export async function pullHistoric() {
   }
   return runKind("historic", async () => {
     let count = 0;
-    const archivedFreights = (await transEu.getArchivedFreights()) as Record<string, unknown>[];
-    for (const item of archivedFreights) {
-      await upsertFreight(item, "historic", false);
-      await recordTraining(item, "archived_freight", {
-        status: item.status,
-        accepted_price: (item as { publication?: { price?: { value?: number } } }).publication?.price?.value ?? null,
-      });
-      count += 1;
+
+    async function pull(name: string, fn: () => Promise<number>) {
+      try {
+        count += await fn();
+      } catch (err) {
+        console.warn(`Historic ${name} failed`, err);
+      }
     }
-    const acceptedFreights = (await transEu.getAcceptedFreights()) as Record<string, unknown>[];
-    for (const item of acceptedFreights) {
-      await upsertFreight(item, "historic", false);
-      await recordTraining(item, "accepted_freight", {
-        status: "accepted",
-        accepted_price: (item as { publication?: { price?: { value?: number } } }).publication?.price?.value ?? null,
-      });
-      count += 1;
-    }
-    const archivedProposals = (await transEu.getArchivedProposals()) as Record<string, unknown>[];
-    for (const item of archivedProposals) {
-      await upsertFreight(item, "historic", false);
-      const price = (item.price as { value?: number }) || {};
-      await recordTraining(item, "archived_proposal", { status: item.status, accepted_price: price.value ?? null });
-      count += 1;
-    }
-    const acceptedProposals = (await transEu.getAcceptedProposals()) as Record<string, unknown>[];
-    for (const item of acceptedProposals) {
-      await upsertFreight(item, "historic", false);
-      const price = (item.price as { value?: number }) || {};
-      await recordTraining(item, "accepted_proposal", { status: "accepted", accepted_price: price.value ?? null });
-      count += 1;
-    }
-    try {
-      const archivedCreated = (await transEu.getArchivedCreatedOrders()) as Record<string, unknown>[];
-      const archivedReceived = (await transEu.getArchivedReceivedOrders()) as Record<string, unknown>[];
-      for (const item of [...archivedCreated, ...archivedReceived]) {
-        await upsertOrder(item, item === archivedCreated[0] ? "created" : "received");
+
+    await pull("archived-freights", async () => {
+      const list = (await transEu.getArchivedFreights()) as Record<string, unknown>[];
+      for (const item of list) {
+        await upsertFreight(item, "historic", false);
+        await recordTraining(item, "archived_freight", {
+          status: item.status,
+          accepted_price: (item as { publication?: { price?: { value?: number } } }).publication?.price?.value ?? null,
+        });
+      }
+      return list.length;
+    });
+    await pull("accepted-freights", async () => {
+      const list = (await transEu.getAcceptedFreights()) as Record<string, unknown>[];
+      for (const item of list) {
+        await upsertFreight(item, "historic", false);
+        await recordTraining(item, "accepted_freight", {
+          status: "accepted",
+          accepted_price: (item as { publication?: { price?: { value?: number } } }).publication?.price?.value ?? null,
+        });
+      }
+      return list.length;
+    });
+    await pull("archived-proposals", async () => {
+      const list = (await transEu.getArchivedProposals()) as Record<string, unknown>[];
+      for (const item of list) {
+        await upsertFreight(item, "historic", false);
+        const price = (item.price as { value?: number }) || {};
+        await recordTraining(item, "archived_proposal", { status: item.status, accepted_price: price.value ?? null });
+      }
+      return list.length;
+    });
+    await pull("accepted-proposals", async () => {
+      const list = (await transEu.getAcceptedProposals()) as Record<string, unknown>[];
+      for (const item of list) {
+        await upsertFreight(item, "historic", false);
+        const price = (item.price as { value?: number }) || {};
+        await recordTraining(item, "accepted_proposal", { status: "accepted", accepted_price: price.value ?? null });
+      }
+      return list.length;
+    });
+    await pull("archived-orders-created", async () => {
+      const list = (await transEu.getArchivedCreatedOrders()) as Record<string, unknown>[];
+      for (const item of list) {
+        await upsertOrder(item, "created");
         const payment = (item.payment as { price?: { value?: number; currency?: string } }) || {};
         await recordTraining(item, "archived_order", {
           status: (item.status as { value?: string })?.value || item.status,
           accepted_price: payment.price?.value ?? null,
           currency: payment.price?.currency ?? null,
         });
-        count += 1;
       }
-    } catch {
-      // archived order endpoints may be unavailable on some accounts
-    }
+      return list.length;
+    });
+    await pull("archived-orders-received", async () => {
+      const list = (await transEu.getArchivedReceivedOrders()) as Record<string, unknown>[];
+      for (const item of list) {
+        await upsertOrder(item, "received");
+        const payment = (item.payment as { price?: { value?: number; currency?: string } }) || {};
+        await recordTraining(item, "archived_order", {
+          status: (item.status as { value?: string })?.value || item.status,
+          accepted_price: payment.price?.value ?? null,
+          currency: payment.price?.currency ?? null,
+        });
+      }
+      return list.length;
+    });
     return count;
   });
 }

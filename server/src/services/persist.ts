@@ -137,45 +137,60 @@ export async function upsertNegotiation(raw: Record<string, unknown>, freightId?
   return inserted.rows[0].id;
 }
 
+function asOptionalNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function asText(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object" && "value" in value) {
+    const inner = (value as { value?: unknown }).value;
+    return inner == null ? null : String(inner);
+  }
+  return null;
+}
+
 export async function upsertOrder(raw: Record<string, unknown>, role: "created" | "received") {
-  const freight = (raw.freight as Record<string, unknown>) || {};
-  const shipper = (freight.shipper as { legal_name?: string }) || {};
-  const carrier = (freight.carrier as { legal_name?: string }) || {};
-  const payment = (raw.payment as { days?: number; price?: { value?: number; currency?: string } }) || {};
-  const spots = (freight.spots as Array<{
-    operations?: Array<{ type?: string; timespans?: { begin?: string } }>;
-    place?: { address?: { locality?: string } };
-  }>) || [];
-  const load = spots.find((s) => s.operations?.some((o) => o.type === "loading"));
-  const unload = spots.find((s) => s.operations?.some((o) => o.type === "unloading"));
-  const transId = String(raw.id || "");
-  const existing = transId
-    ? await query<{ id: string }>("SELECT id FROM orders WHERE trans_order_id = $1", [transId])
-    : { rows: [] as { id: string }[] };
+  if (!isRecord(raw) || raw.next_order != null && raw.id == null) return null;
+  const freight = isRecord(raw.freight) ? raw.freight : {};
+  const shipper = isRecord(freight.shipper) ? freight.shipper : {};
+  const carrier = isRecord(freight.carrier) ? freight.carrier : {};
+  const payment = isRecord(raw.payment) ? raw.payment : {};
+  const price = isRecord(payment.price) ? payment.price : {};
+  const spots = Array.isArray(freight.spots) ? freight.spots : [];
+  const load = spots.find((s) => isRecord(s) && Array.isArray(s.operations) && s.operations.some((o) => isRecord(o) && o.type === "loading"));
+  const unload = spots.find((s) => isRecord(s) && Array.isArray(s.operations) && s.operations.some((o) => isRecord(o) && o.type === "unloading"));
+  const transId = raw.id != null && raw.id !== "" ? String(raw.id) : "";
+  if (!transId) return null;
+  const existing = await query<{ id: string }>("SELECT id FROM orders WHERE trans_order_id = $1::text", [transId]);
   const values = [
-    transId || null,
-    raw.legacy_freight_id || freight.id || null,
-    raw.number || null,
-    (raw.status as { value?: string })?.value || raw.status || null,
+    transId,
+    asOptionalNumber(raw.legacy_freight_id ?? freight.id),
+    asText(raw.number),
+    asText(raw.status),
     role,
-    payment.price?.value ?? null,
-    (payment.price?.currency || "EUR").toString().toUpperCase(),
-    payment.days ?? null,
-    shipper.legal_name || null,
-    carrier.legal_name || null,
-    load?.place?.address?.locality || null,
-    unload?.place?.address?.locality || null,
-    load?.operations?.find((o) => o.type === "loading")?.timespans?.begin || null,
-    unload?.operations?.find((o) => o.type === "unloading")?.timespans?.begin || null,
+    asOptionalNumber(price.value),
+    asText(price.currency)?.toUpperCase() || "EUR",
+    asOptionalNumber(payment.days),
+    asText(shipper.legal_name),
+    asText(carrier.legal_name),
+    asText(isRecord(load) && isRecord(load.place) && isRecord(load.place.address) ? load.place.address.locality : null),
+    asText(isRecord(unload) && isRecord(unload.place) && isRecord(unload.place.address) ? unload.place.address.locality : null),
+    spotBegin(load, "loading"),
+    spotBegin(unload, "unloading"),
     raw,
   ];
   if (existing.rows[0]) {
     await query(
-      `UPDATE orders SET trans_freight_id=$2, number=$3, status=$4, role=$5, price=$6,
-        currency=$7, payment_days=$8, shipper_name=$9, carrier_name=$10,
-        loading_locality=$11, unloading_locality=$12, loading_at=$13, unloading_at=$14,
-        raw=$15, last_synced_at=now(), updated_at=now()
-       WHERE id=$16`,
+      `UPDATE orders SET trans_freight_id=$2::bigint, number=$3::text, status=$4::text, role=$5::text, price=$6::numeric,
+        currency=$7::text, payment_days=$8::int, shipper_name=$9::text, carrier_name=$10::text,
+        loading_locality=$11::text, unloading_locality=$12::text, loading_at=$13::timestamptz, unloading_at=$14::timestamptz,
+        raw=$15::jsonb, last_synced_at=now(), updated_at=now()
+       WHERE id=$16::uuid`,
       [...values, existing.rows[0].id]
     );
     return existing.rows[0].id;
@@ -185,17 +200,31 @@ export async function upsertOrder(raw: Record<string, unknown>, role: "created" 
       trans_order_id, trans_freight_id, number, status, role, price, currency,
       payment_days, shipper_name, carrier_name, loading_locality, unloading_locality,
       loading_at, unloading_at, raw, last_synced_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now()) RETURNING id`,
+    ) VALUES (
+      $1::text,$2::bigint,$3::text,$4::text,$5::text,$6::numeric,$7::text,$8::int,
+      $9::text,$10::text,$11::text,$12::text,$13::timestamptz,$14::timestamptz,$15::jsonb, now()
+    ) RETURNING id`,
     values
   );
   return inserted.rows[0].id;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function spotBegin(spot: unknown, type: string): string | null {
+  if (!isRecord(spot) || !Array.isArray(spot.operations)) return null;
+  const op = spot.operations.find((item) => isRecord(item) && item.type === type);
+  if (!isRecord(op) || !isRecord(op.timespans)) return null;
+  return asText(op.timespans.begin);
 }
 
 export async function recordTraining(raw: Record<string, unknown>, source: string, outcome: Record<string, unknown>) {
   const flat = flattenFreight(raw, source);
   await query(
     `INSERT INTO training_samples (source, trans_id, route_key, features, outcome, raw)
-     VALUES ($1,$2,$3,$4,$5,$6)`,
+     VALUES ($1::text,$2::text,$3::text,$4::jsonb,$5::jsonb,$6::jsonb)`,
     [
       source,
       String(flat.trans_freight_id || flat.trans_offer_id || ""),
