@@ -1,6 +1,25 @@
 import { useEffect, useState } from "react";
 import { api, type Feed } from "../api";
 
+const TRUCK_BODIES = [
+  "curtainsider",
+  "box",
+  "cooler",
+  "isotherm",
+  "mega",
+  "jumbo",
+  "platform",
+  "coilmulde",
+  "tipper",
+  "tanker",
+  "walkingfloor",
+  "lowloader",
+  "cartransporter",
+];
+
+const VEHICLE_SIZES = ["van", "lorry", "solo", "truck_tractor", "bus"];
+const TRANSPORT_TYPES = ["ftl", "ltl"];
+
 const empty: Feed = {
   name: "",
   enabled: true,
@@ -27,6 +46,47 @@ const empty: Feed = {
   auto_mode: "suggest",
   notes: "",
 };
+
+function toggle(list: string[], value: string) {
+  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+}
+
+function MultiPick({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <div>
+      <div className="text-sm">
+        {label} <span className="text-mute">{value.length ? value.join(", ") : "any"}</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5 mt-1.5">
+        {options.map((option) => {
+          const on = value.includes(option);
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onChange(toggle(value, option))}
+              className={`px-2 py-1 rounded text-xs border ${
+                on ? "bg-signal text-ink border-signal" : "border-line text-paper/80 hover:bg-raised"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function csv(v: string) {
   return v.split(",").map((s) => s.trim()).filter(Boolean);
@@ -215,9 +275,11 @@ export default function Feeds() {
               <input className="w-full mt-1" type="number" value={draft.first_offer_discount_pct} onChange={(e) => field("first_offer_discount_pct", Number(e.target.value))} />
             </label>
           </div>
-          <label className="text-sm block">Bodies / sizes / types
-            <input className="w-full mt-1" value={[...draft.truck_bodies, ...draft.vehicle_sizes, ...draft.transport_types].join(", ")} readOnly />
-          </label>
+          <div className="space-y-3 pt-1">
+            <MultiPick label="Truck bodies" options={TRUCK_BODIES} value={draft.truck_bodies} onChange={(v) => field("truck_bodies", v)} />
+            <MultiPick label="Vehicle sizes" options={VEHICLE_SIZES} value={draft.vehicle_sizes} onChange={(v) => field("vehicle_sizes", v)} />
+            <MultiPick label="Transport types" options={TRANSPORT_TYPES} value={draft.transport_types} onChange={(v) => field("transport_types", v)} />
+          </div>
           <label className="text-sm block">Notes
             <textarea className="w-full mt-1" rows={3} value={draft.notes || ""} onChange={(e) => field("notes", e.target.value)} />
           </label>
