@@ -57,15 +57,15 @@ export async function upsertFreight(raw: Record<string, unknown>, source: string
     id = existing.rows[0].id;
     await query(
       `UPDATE freights SET
-        trans_offer_id=$2, reference_number=$4, status=$5, shipper_name=$6, shipper_vat=$7,
-        shipper_company_id=$8, loading_country=$9, loading_locality=$10, loading_postal=$11,
-        loading_lat=$12, loading_lng=$13, loading_at=$14, unloading_country=$15,
-        unloading_locality=$16, unloading_postal=$17, unloading_lat=$18, unloading_lng=$19,
-        unloading_at=$20, distance_m=$21, weight_t=$22, loading_meters=$23, volume=$24,
-        truck_bodies=$25, vehicle_size=$26, transport_type=$27, ftl=$28, published_price=$29,
-        published_currency=$30, price_type=$31, payment_days=$32, payment_type=$33,
-        is_first_buy=$34, is_quick_pay=$35, decision_date=$36, publish_date=$37, raw=$38,
-        last_synced_at=now(), updated_at=now()
+        trans_freight_id=$1, trans_offer_id=$2, source=$3, reference_number=$4, status=$5,
+        shipper_name=$6, shipper_vat=$7, shipper_company_id=$8, loading_country=$9,
+        loading_locality=$10, loading_postal=$11, loading_lat=$12, loading_lng=$13,
+        loading_at=$14, unloading_country=$15, unloading_locality=$16, unloading_postal=$17,
+        unloading_lat=$18, unloading_lng=$19, unloading_at=$20, distance_m=$21, weight_t=$22,
+        loading_meters=$23, volume=$24, truck_bodies=$25, vehicle_size=$26, transport_type=$27,
+        ftl=$28, published_price=$29, published_currency=$30, price_type=$31, payment_days=$32,
+        payment_type=$33, is_first_buy=$34, is_quick_pay=$35, decision_date=$36, publish_date=$37,
+        raw=$38, last_synced_at=now(), updated_at=now()
        WHERE id=$39`,
       [...params, id]
     );
@@ -119,9 +119,9 @@ export async function upsertNegotiation(raw: Record<string, unknown>, freightId?
   ];
   if (existing.rows[0]) {
     await query(
-      `UPDATE negotiations SET freight_id=COALESCE($2, freight_id), trans_freight_id=$3,
-        status=$4, version=$5, current_price=$6, currency=$7, counterpart_name=$9,
-        counterpart_vat=$10, raw=$11, last_synced_at=now(), updated_at=now()
+      `UPDATE negotiations SET trans_offer_id=$1, freight_id=COALESCE($2, freight_id),
+        trans_freight_id=$3, status=$4, version=$5, current_price=$6, currency=$7, our_role=$8,
+        counterpart_name=$9, counterpart_vat=$10, raw=$11, last_synced_at=now(), updated_at=now()
        WHERE id=$12`,
       [...fields, existing.rows[0].id]
     );
@@ -166,7 +166,7 @@ export async function upsertOrder(raw: Record<string, unknown>, role: "created" 
   const unload = spots.find((s) => isRecord(s) && Array.isArray(s.operations) && s.operations.some((o) => isRecord(o) && o.type === "unloading"));
   const transId = raw.id != null && raw.id !== "" ? String(raw.id) : "";
   if (!transId) return null;
-  const existing = await query<{ id: string }>("SELECT id FROM orders WHERE trans_order_id = $1::text", [transId]);
+  const existing = await query<{ id: string }>("SELECT id FROM orders WHERE trans_order_id = $1", [transId]);
   const values = [
     transId,
     asOptionalNumber(raw.legacy_freight_id ?? freight.id),
@@ -182,15 +182,15 @@ export async function upsertOrder(raw: Record<string, unknown>, role: "created" 
     asText(isRecord(unload) && isRecord(unload.place) && isRecord(unload.place.address) ? unload.place.address.locality : null),
     spotBegin(load, "loading"),
     spotBegin(unload, "unloading"),
-    raw,
+    JSON.stringify(raw),
   ];
   if (existing.rows[0]) {
     await query(
-      `UPDATE orders SET trans_freight_id=$2::bigint, number=$3::text, status=$4::text, role=$5::text, price=$6::numeric,
-        currency=$7::text, payment_days=$8::int, shipper_name=$9::text, carrier_name=$10::text,
-        loading_locality=$11::text, unloading_locality=$12::text, loading_at=$13::timestamptz, unloading_at=$14::timestamptz,
+      `UPDATE orders SET trans_order_id=$1, trans_freight_id=$2, number=$3, status=$4, role=$5, price=$6,
+        currency=$7, payment_days=$8, shipper_name=$9, carrier_name=$10,
+        loading_locality=$11, unloading_locality=$12, loading_at=$13, unloading_at=$14,
         raw=$15::jsonb, last_synced_at=now(), updated_at=now()
-       WHERE id=$16::uuid`,
+       WHERE id=$16`,
       [...values, existing.rows[0].id]
     );
     return existing.rows[0].id;
@@ -201,8 +201,7 @@ export async function upsertOrder(raw: Record<string, unknown>, role: "created" 
       payment_days, shipper_name, carrier_name, loading_locality, unloading_locality,
       loading_at, unloading_at, raw, last_synced_at
     ) VALUES (
-      $1::text,$2::bigint,$3::text,$4::text,$5::text,$6::numeric,$7::text,$8::int,
-      $9::text,$10::text,$11::text,$12::text,$13::timestamptz,$14::timestamptz,$15::jsonb, now()
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb, now()
     ) RETURNING id`,
     values
   );
@@ -224,12 +223,12 @@ export async function recordTraining(raw: Record<string, unknown>, source: strin
   const flat = flattenFreight(raw, source);
   await query(
     `INSERT INTO training_samples (source, trans_id, route_key, features, outcome, raw)
-     VALUES ($1::text,$2::text,$3::text,$4::jsonb,$5::jsonb,$6::jsonb)`,
+     VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb)`,
     [
       source,
       String(flat.trans_freight_id || flat.trans_offer_id || ""),
       routeKey(flat),
-      {
+      JSON.stringify({
         loading_country: flat.loading_country,
         loading_locality: flat.loading_locality,
         unloading_country: flat.unloading_country,
@@ -242,9 +241,9 @@ export async function recordTraining(raw: Record<string, unknown>, source: strin
         currency: flat.published_currency,
         payment_days: flat.payment_days,
         loading_at: flat.loading_at,
-      },
-      outcome,
-      raw,
+      }),
+      JSON.stringify(outcome),
+      JSON.stringify(raw),
     ]
   );
 }

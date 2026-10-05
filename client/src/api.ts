@@ -96,6 +96,7 @@ export type Feed = {
   target_rate_per_km: number | null;
   min_price: number | null;
   max_price: number | null;
+  min_margin_pct?: number | null;
   auto_accept_threshold: number | null;
   first_offer_discount_pct: number;
   max_rounds: number;

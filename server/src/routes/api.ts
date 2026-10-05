@@ -10,6 +10,27 @@ import { getValidAccessToken } from "../services/transEuAuth.js";
 
 export const apiRouter = Router();
 
+const nullableNum = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : value;
+  }
+  return value;
+}, z.number().nullable().optional());
+
+const optionalNum = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : value;
+  }
+  return value;
+}, z.number().optional());
+
 const feedSchema = z.object({
   name: z.string().min(2),
   enabled: z.boolean().optional(),
@@ -20,23 +41,31 @@ const feedSchema = z.object({
   truck_bodies: z.array(z.string()).optional(),
   vehicle_sizes: z.array(z.string()).optional(),
   transport_types: z.array(z.string()).optional(),
-  min_weight_t: z.number().nullable().optional(),
-  max_weight_t: z.number().nullable().optional(),
-  min_distance_km: z.number().nullable().optional(),
-  max_distance_km: z.number().nullable().optional(),
-  date_window_days: z.number().optional(),
+  min_weight_t: nullableNum,
+  max_weight_t: nullableNum,
+  min_distance_km: nullableNum,
+  max_distance_km: nullableNum,
+  date_window_days: optionalNum,
   currency: z.string().optional(),
-  target_rate_per_km: z.number().nullable().optional(),
-  min_price: z.number().nullable().optional(),
-  max_price: z.number().nullable().optional(),
-  min_margin_pct: z.number().nullable().optional(),
-  auto_accept_threshold: z.number().nullable().optional(),
-  first_offer_discount_pct: z.number().optional(),
-  max_rounds: z.number().optional(),
+  target_rate_per_km: nullableNum,
+  min_price: nullableNum,
+  max_price: nullableNum,
+  min_margin_pct: nullableNum,
+  auto_accept_threshold: nullableNum,
+  first_offer_discount_pct: optionalNum,
+  max_rounds: optionalNum,
   strategy: z.enum(["aggressive", "moderate", "conservative"]).optional(),
   auto_mode: z.enum(["off", "suggest", "execute"]).optional(),
   notes: z.string().nullable().optional(),
 });
+
+function feedParseError(error: z.ZodError) {
+  const flat = error.flatten();
+  const fields = Object.entries(flat.fieldErrors)
+    .map(([key, messages]) => `${key}: ${(messages || []).join(", ")}`)
+    .join("; ");
+  return { error: fields || flat.formErrors.join("; ") || "Invalid feed", ...flat };
+}
 
 apiRouter.get("/dashboard", async (_req, res) => {
   const [feeds, freights, negotiations, orders, actions, samples, syncs] = await Promise.all([
@@ -83,7 +112,7 @@ apiRouter.get("/dashboard", async (_req, res) => {
 apiRouter.get("/feeds", async (_req, res) => {
   const rows = await query(
     `SELECT f.*,
-      (SELECT count(*) FROM freights fr WHERE fr.matched_feed_id = f.id AND fr.source <> 'historic') AS watched
+      (SELECT count(*)::int FROM freights fr WHERE fr.matched_feed_id = f.id AND fr.source <> 'historic') AS watched
      FROM feeds f ORDER BY created_at`
   );
   res.json(rows.rows);
@@ -92,7 +121,7 @@ apiRouter.get("/feeds", async (_req, res) => {
 apiRouter.post("/feeds", async (req, res) => {
   const parsed = feedSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json(parsed.error.flatten());
+    res.status(400).json(feedParseError(parsed.error));
     return;
   }
   const f = parsed.data;
@@ -123,7 +152,7 @@ apiRouter.post("/feeds", async (req, res) => {
 apiRouter.patch("/feeds/:id", async (req, res) => {
   const parsed = feedSchema.partial().safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json(parsed.error.flatten());
+    res.status(400).json(feedParseError(parsed.error));
     return;
   }
   const current = (await query("SELECT * FROM feeds WHERE id = $1", [req.params.id])).rows[0];

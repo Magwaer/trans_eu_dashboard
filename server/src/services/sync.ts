@@ -75,9 +75,22 @@ export async function syncLive() {
     await runKind("orders", async () => {
       const created = (await transEu.getCreatedOrders()) as Record<string, unknown>[];
       const received = (await transEu.getReceivedOrders()) as Record<string, unknown>[];
-      for (const item of created) await upsertOrder(item, "created");
-      for (const item of received) await upsertOrder(item, "received");
-      return created.length + received.length;
+      let saved = 0;
+      for (const item of created) {
+        try {
+          if (await upsertOrder(item, "created")) saved += 1;
+        } catch (err) {
+          console.warn("Order created upsert failed", item.id, err);
+        }
+      }
+      for (const item of received) {
+        try {
+          if (await upsertOrder(item, "received")) saved += 1;
+        } catch (err) {
+          console.warn("Order received upsert failed", item.id, err);
+        }
+      }
+      return saved;
     })
   );
   return results;

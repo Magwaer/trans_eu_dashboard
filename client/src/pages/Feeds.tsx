@@ -32,6 +32,60 @@ function csv(v: string) {
   return v.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+function asNum(value: unknown, fallback: number | null = null): number | null {
+  if (value == null || value === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function toDraft(feed: Feed): Feed {
+  return {
+    ...empty,
+    ...feed,
+    target_rate_per_km: asNum(feed.target_rate_per_km, empty.target_rate_per_km),
+    min_price: asNum(feed.min_price),
+    max_price: asNum(feed.max_price),
+    min_weight_t: asNum(feed.min_weight_t),
+    max_weight_t: asNum(feed.max_weight_t),
+    min_distance_km: asNum(feed.min_distance_km),
+    max_distance_km: asNum(feed.max_distance_km),
+    date_window_days: asNum(feed.date_window_days, empty.date_window_days) ?? empty.date_window_days,
+    first_offer_discount_pct: asNum(feed.first_offer_discount_pct, empty.first_offer_discount_pct) ?? empty.first_offer_discount_pct,
+    max_rounds: asNum(feed.max_rounds, empty.max_rounds) ?? empty.max_rounds,
+    auto_accept_threshold: asNum(feed.auto_accept_threshold),
+    watched: asNum(feed.watched, 0) ?? 0,
+  };
+}
+
+function payload(feed: Feed) {
+  return {
+    name: feed.name,
+    enabled: feed.enabled,
+    loading_countries: feed.loading_countries,
+    loading_localities: feed.loading_localities,
+    unloading_countries: feed.unloading_countries,
+    unloading_localities: feed.unloading_localities,
+    truck_bodies: feed.truck_bodies,
+    vehicle_sizes: feed.vehicle_sizes,
+    transport_types: feed.transport_types,
+    min_weight_t: asNum(feed.min_weight_t),
+    max_weight_t: asNum(feed.max_weight_t),
+    min_distance_km: asNum(feed.min_distance_km),
+    max_distance_km: asNum(feed.max_distance_km),
+    date_window_days: asNum(feed.date_window_days, 14) ?? 14,
+    currency: feed.currency,
+    target_rate_per_km: asNum(feed.target_rate_per_km),
+    min_price: asNum(feed.min_price),
+    max_price: asNum(feed.max_price),
+    auto_accept_threshold: asNum(feed.auto_accept_threshold),
+    first_offer_discount_pct: asNum(feed.first_offer_discount_pct, 8) ?? 8,
+    max_rounds: asNum(feed.max_rounds, 3) ?? 3,
+    strategy: feed.strategy,
+    auto_mode: feed.auto_mode,
+    notes: feed.notes || null,
+  };
+}
+
 export default function Feeds() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [draft, setDraft] = useState<Feed>(empty);
@@ -83,7 +137,7 @@ export default function Feeds() {
               </div>
               <p className="text-mute text-sm mt-3">{feed.notes}</p>
               <div className="flex gap-2 mt-4">
-                <button className="text-sm border border-line px-3 py-1 rounded" onClick={() => setDraft(feed)}>
+                <button className="text-sm border border-line px-3 py-1 rounded" onClick={() => setDraft(toDraft(feed))}>
                   Edit
                 </button>
                 <button
@@ -105,7 +159,7 @@ export default function Feeds() {
             e.preventDefault();
             setError("");
             try {
-              await api.saveFeed(draft, draft.id);
+              await api.saveFeed(payload(draft), draft.id);
               setDraft(empty);
               await load();
             } catch (err) {

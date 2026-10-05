@@ -46,7 +46,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asItemList<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) {
-    return payload.filter((item) => isRecord(item) && !("next_order" in item && !("id" in item))) as T[];
+    return payload.filter((item) => isRecord(item) && item.id != null && item.id !== "") as T[];
   }
   if (isRecord(payload)) {
     for (const key of ["orders", "freights", "freight_proposals", "items", "data", "results"]) {
