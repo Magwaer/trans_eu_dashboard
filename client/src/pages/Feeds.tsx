@@ -166,14 +166,14 @@ export default function Feeds() {
     <div>
       <header className="mb-6">
         <div className="text-signal text-xs tracking-[0.18em] uppercase">Watch + price rules</div>
-        <h1 className="font-display text-4xl">Freight feeds</h1>
+        <h1 className="font-display text-3xl md:text-4xl">Freight feeds</h1>
         <p className="text-mute mt-2 max-w-2xl">
           Each feed is a lane filter plus negotiation policy. Matching proposals are scored, priced, and either queued for
           approval or sent automatically.
         </p>
       </header>
       {error && <p className="text-rust mb-4">{error}</p>}
-      <div className="grid grid-cols-[1.1fr_0.9fr] gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-6">
         <div className="space-y-4">
           {feeds.map((feed) => (
             <article key={feed.id} className="bg-panel border border-line rounded-2xl p-5">
@@ -190,24 +190,41 @@ export default function Feeds() {
                   <div className="text-xs text-mute">{feed.enabled ? "on" : "paused"}</div>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 text-sm">
                 <div>Target {feed.target_rate_per_km} {feed.currency}/km</div>
                 <div>Floor {feed.min_price ?? "—"}</div>
                 <div>Auto-accept {feed.auto_accept_threshold ?? "—"}</div>
               </div>
               <p className="text-mute text-sm mt-3">{feed.notes}</p>
-              <div className="flex gap-2 mt-4">
-                <button className="text-sm border border-line px-3 py-1 rounded" onClick={() => setDraft(toDraft(feed))}>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <button className="text-sm border border-line px-3 py-2 rounded min-h-11" onClick={() => setDraft(toDraft(feed))}>
                   Edit
                 </button>
                 <button
-                  className="text-sm border border-line px-3 py-1 rounded"
+                  className="text-sm border border-line px-3 py-2 rounded min-h-11"
                   onClick={async () => {
                     await api.saveFeed({ enabled: !feed.enabled }, feed.id);
                     await load();
                   }}
                 >
                   {feed.enabled ? "Pause" : "Enable"}
+                </button>
+                <button
+                  className="text-sm border border-rust/50 text-rust px-3 py-2 rounded min-h-11"
+                  onClick={async () => {
+                    if (!feed.id) return;
+                    if (!window.confirm(`Delete feed “${feed.name}”? Matching on this lane will stop.`)) return;
+                    setError("");
+                    try {
+                      await api.deleteFeed(feed.id);
+                      if (draft.id === feed.id) setDraft(empty);
+                      await load();
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : String(err));
+                    }
+                  }}
+                >
+                  Delete
                 </button>
               </div>
             </article>
@@ -231,7 +248,7 @@ export default function Feeds() {
           <label className="block text-sm">Name
             <input className="w-full mt-1" value={draft.name} onChange={(e) => field("name", e.target.value)} required />
           </label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="text-sm">From countries
               <input className="w-full mt-1" value={draft.loading_countries.join(",")} onChange={(e) => field("loading_countries", csv(e.target.value))} placeholder="pl,cz" />
             </label>
@@ -245,7 +262,7 @@ export default function Feeds() {
               <input className="w-full mt-1" value={draft.unloading_localities.join(",")} onChange={(e) => field("unloading_localities", csv(e.target.value))} />
             </label>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <label className="text-sm">EUR/km
               <input className="w-full mt-1" type="number" step="0.01" value={draft.target_rate_per_km ?? ""} onChange={(e) => field("target_rate_per_km", e.target.value === "" ? null : Number(e.target.value))} />
             </label>
@@ -256,7 +273,7 @@ export default function Feeds() {
               <input className="w-full mt-1" type="number" value={draft.auto_accept_threshold ?? ""} onChange={(e) => field("auto_accept_threshold", e.target.value === "" ? null : Number(e.target.value))} />
             </label>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <label className="text-sm">Strategy
               <select className="w-full mt-1" value={draft.strategy} onChange={(e) => field("strategy", e.target.value as Feed["strategy"])}>
                 <option>aggressive</option>
@@ -283,7 +300,7 @@ export default function Feeds() {
           <label className="text-sm block">Notes
             <textarea className="w-full mt-1" rows={3} value={draft.notes || ""} onChange={(e) => field("notes", e.target.value)} />
           </label>
-          <button className="bg-signal text-ink px-4 py-2 rounded-lg">{draft.id ? "Save feed" : "Create feed"}</button>
+          <button className="bg-signal text-ink px-4 py-2.5 rounded-lg w-full sm:w-auto">{draft.id ? "Save feed" : "Create feed"}</button>
         </form>
       </div>
     </div>

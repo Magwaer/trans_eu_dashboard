@@ -31,6 +31,8 @@ export const api = {
       body: JSON.stringify(data),
     }),
   deleteFeed: (id: string) => req(`/api/feeds/${id}`, { method: "DELETE" }),
+  searchExchange: (data: ExchangeSearch) =>
+    req<ExchangeResult>("/api/exchange", { method: "POST", body: JSON.stringify(data) }),
   inbox: (query = "") => req<Freight[]>(`/api/inbox${query}`),
   freight: (id: string) => req<FreightDetail>(`/api/inbox/${id}`),
   addNote: (id: string, body: Record<string, unknown>) =>
@@ -104,6 +106,50 @@ export type Feed = {
   auto_mode: "off" | "suggest" | "execute";
   notes?: string | null;
   watched?: number;
+};
+
+export type ExchangeSearch = {
+  loading_country?: string;
+  loading_locality?: string;
+  loading_postal?: string;
+  loading_range_km?: number | null;
+  unloading_country?: string;
+  unloading_locality?: string;
+  date_from?: string;
+  date_to?: string;
+  truck_bodies?: string[];
+  vehicle_sizes?: string[];
+  max_weight_t?: number | null;
+  max_length_m?: number | null;
+  exclude_suspended?: boolean;
+  sort_field?: string;
+  sort_order?: "asc" | "desc";
+};
+
+export type ExchangeOffer = {
+  id: string;
+  freight_id?: string | number | null;
+  shipper_name?: string | null;
+  loading_country?: string | null;
+  loading_locality?: string | null;
+  unloading_country?: string | null;
+  unloading_locality?: string | null;
+  loading_at?: string | null;
+  unloading_at?: string | null;
+  distance_m?: number | null;
+  weight_t?: number | null;
+  length_m?: number | null;
+  truck_bodies: string[];
+  vehicle_sizes: string[];
+  published_price?: number | null;
+  published_currency?: string | null;
+  status?: string | null;
+  url?: string;
+};
+
+export type ExchangeResult = {
+  total: number;
+  items: ExchangeOffer[];
 };
 
 export type Freight = {
@@ -218,6 +264,6 @@ export function when(d?: string | null) {
   return new Date(d).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-export function lane(row: { loading_locality?: string; loading_country?: string; unloading_locality?: string; unloading_country?: string }) {
+export function lane(row: { loading_locality?: string | null; loading_country?: string | null; unloading_locality?: string | null; unloading_country?: string | null }) {
   return `${row.loading_locality || "?"} ${(row.loading_country || "").toUpperCase()} → ${row.unloading_locality || "?"} ${(row.unloading_country || "").toUpperCase()}`;
 }

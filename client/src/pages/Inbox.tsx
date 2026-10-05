@@ -30,11 +30,30 @@ export default function Inbox() {
     <div>
       <header className="mb-6">
         <div className="text-signal text-xs tracking-[0.18em] uppercase">Matched + unmatched loads</div>
-        <h1 className="font-display text-4xl">Inbox</h1>
+        <h1 className="font-display text-3xl md:text-4xl">Inbox</h1>
       </header>
       {error && <p className="text-rust mb-3">{error}</p>}
-      <div className={id ? "grid grid-cols-[1fr_0.9fr] gap-6" : ""}>
-        <div className="bg-panel border border-line rounded-2xl overflow-hidden">
+      <div className={id ? "grid grid-cols-1 xl:grid-cols-[1fr_0.9fr] gap-6" : ""}>
+        <div className="md:hidden space-y-3">
+          {rows.map((row) => (
+            <Link
+              key={row.id}
+              to={`/inbox/${row.id}`}
+              className={`block bg-panel border border-line rounded-2xl p-4 ${id === row.id ? "border-signal" : ""}`}
+            >
+              <div className="font-medium">{lane(row)}</div>
+              <div className="text-mute text-xs mt-1">
+                {row.shipper_name} · {row.weight_t}t · {km(row.distance_m)} · {row.source}
+              </div>
+              <div className="flex justify-between gap-3 mt-3 text-sm">
+                <span>{when(row.loading_at)}</span>
+                <span className="mono text-signal">{money(row.suggested_price, row.suggested_currency)}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+        <div className="hidden md:block bg-panel border border-line rounded-2xl overflow-hidden">
+          <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -64,6 +83,7 @@ export default function Inbox() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
         {detail && (
           <aside className="space-y-4">
@@ -77,9 +97,9 @@ export default function Inbox() {
                 <div>Pay {detail.freight.payment_days || "—"} days</div>
                 <div>{detail.freight.is_quick_pay ? "QuickPay" : "Standard"}</div>
               </div>
-              <div className="flex flex-wrap gap-2 mt-4">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 mt-4">
                 <button
-                  className="bg-signal text-ink px-3 py-1.5 rounded"
+                  className="bg-signal text-ink px-3 py-2.5 rounded min-h-11"
                   onClick={async () => {
                     await api.price(detail.freight.id);
                     await loadDetail(detail.freight.id);
@@ -89,7 +109,7 @@ export default function Inbox() {
                   Recalculate with Anthropic
                 </button>
                 <button
-                  className="border border-line px-3 py-1.5 rounded"
+                  className="border border-line px-3 py-2.5 rounded min-h-11"
                   onClick={async () => {
                     const r = await api.reply({
                       freightId: detail.freight.id,
@@ -115,7 +135,7 @@ export default function Inbox() {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-[120px_1fr] gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-2">
                 <select value={kind} onChange={(e) => setKind(e.target.value)}>
                   <option>note</option>
                   <option>cost</option>

@@ -15,8 +15,41 @@ export type SpotLike = {
   };
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function firstSpot(spots: SpotLike[] | undefined, type: string) {
   return (spots || []).find((s) => s.operations?.some((op) => op.type === type));
+}
+
+function asAddress(value: unknown): { country?: string; locality?: string; postal_code?: string } | undefined {
+  if (!isRecord(value)) return undefined;
+  const country = Array.isArray(value.country) ? value.country[0] : value.country;
+  return {
+    country: typeof country === "string" ? country : undefined,
+    locality: typeof value.locality === "string" ? value.locality : undefined,
+    postal_code: typeof value.postal_code === "string" ? value.postal_code : undefined,
+  };
+}
+
+function asCoords(value: unknown): { latitude?: number; longitude?: number } | undefined {
+  if (!isRecord(value)) return undefined;
+  const latitude = Number(value.latitude ?? value.lat);
+  const longitude = Number(value.longitude ?? value.lng ?? value.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+  return { latitude, longitude };
+}
+
+function placeBlock(raw: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = raw[key];
+    if (!isRecord(value)) continue;
+    const address = asAddress(value.address) || asAddress(value.place) || asAddress(value);
+    const coordinates = asCoords(value.coordinates) || asCoords(value);
+    if (address || coordinates) return { address, coordinates, timespans: isRecord(value.timespans) ? value.timespans : undefined };
+  }
+  return undefined;
 }
 
 function opTime(spot: SpotLike | undefined, type: string) {
@@ -29,32 +62,24 @@ export function extractRoute(raw: Record<string, unknown>) {
   const spots = (freight.spots as SpotLike[]) || [];
   const loadingSpot = firstSpot(spots, "loading");
   const unloadingSpot = firstSpot(spots, "unloading");
+  const loadingPlace = placeBlock(raw, "loading_place", "loading") || placeBlock(freight, "loading_place", "loading");
+  const unloadingPlace = placeBlock(raw, "unloading_place", "unloading") || placeBlock(freight, "unloading_place", "unloading");
 
-  const loading =
-    loadingSpot?.place ||
-    (raw.loading as { place?: SpotLike["place"]; coordinates?: { latitude?: number; longitude?: number }; timespans?: { begin?: string } } | undefined);
+  const loadAddr = loadingSpot?.place?.address || loadingPlace?.address;
+  const unloadAddr = unloadingSpot?.place?.address || unloadingPlace?.address;
 
-  const unloading =
-    unloadingSpot?.place ||
-    (raw.unloading as { place?: SpotLike["place"]; coordinates?: { latitude?: number; longitude?: number }; timespans?: { begin?: string } } | undefined);
-
-  const loadAddr = loadingSpot?.place?.address || (raw.loading as { place?: { country?: string; locality?: string; postal_code?: string } } | undefined)?.place;
-  const unloadAddr = unloadingSpot?.place?.address || (raw.unloading as { place?: { country?: string; locality?: string; postal_code?: string } } | undefined)?.place;
-
-  const loadCoords =
-    loadingSpot?.place?.coordinates ||
-    (raw.loading as { coordinates?: { latitude?: number; longitude?: number } } | undefined)?.coordinates;
-  const unloadCoords =
-    unloadingSpot?.place?.coordinates ||
-    (raw.unloading as { coordinates?: { latitude?: number; longitude?: number } } | undefined)?.coordinates;
+  const loadCoords = loadingSpot?.place?.coordinates || loadingPlace?.coordinates;
+  const unloadCoords = unloadingSpot?.place?.coordinates || unloadingPlace?.coordinates;
 
   const loadingAt =
     opTime(loadingSpot, "loading") ||
-    (raw.loading as { timespans?: { begin?: string } } | undefined)?.timespans?.begin ||
+    (typeof loadingPlace?.timespans?.begin === "string" ? loadingPlace.timespans.begin : null) ||
+    (isRecord(raw.loading_date) && typeof raw.loading_date.from === "string" ? raw.loading_date.from : null) ||
     null;
   const unloadingAt =
     opTime(unloadingSpot, "unloading") ||
-    (raw.unloading as { timespans?: { begin?: string } } | undefined)?.timespans?.begin ||
+    (typeof unloadingPlace?.timespans?.begin === "string" ? unloadingPlace.timespans.begin : null) ||
+    (isRecord(raw.unloading_date) && typeof raw.unloading_date.from === "string" ? raw.unloading_date.from : null) ||
     null;
 
   let distanceM =
@@ -93,10 +118,11 @@ export function flattenFreight(raw: Record<string, unknown>, source: string) {
     {};
   const requirements = (freight.requirements as Record<string, unknown>) || (raw.requirements as Record<string, unknown>) || {};
   const transport = (requirements.transport as Record<string, unknown>) || {};
-  const shipper = (freight.shipper as Record<string, unknown>) || {};
+  const shipper = (freight.shipper as Record<string, unknown>) || (raw.company as Record<string, unknown>) || {};
   const price =
     (raw.price as { value?: number; currency?: string }) ||
     (publication.price as { value?: number; currency?: string }) ||
+    (isRecord(raw.payment) && isRecord(raw.payment.price) ? raw.payment.price : {}) ||
     {};
   const period = (publication.period as { days?: number; payment?: string }) || {};
   const route = extractRoute(raw);
@@ -113,11 +139,11 @@ export function flattenFreight(raw: Record<string, unknown>, source: string) {
     source,
     reference_number: (freight.shipment_external_id as string) || (raw.reference_number as string) || null,
     status: (raw.status as string) || (publication.status as string) || "active",
-    shipper_name: (shipper.legal_name as string) || null,
+    shipper_name: (shipper.legal_name as string) || (shipper.name as string) || null,
     shipper_vat: (shipper.vat_id as string) || null,
     shipper_company_id: (shipper.company_id as number) || null,
     ...route,
-    weight_t: capacity?.value ?? (raw.volume as number) ?? null,
+    weight_t: capacity?.value ?? (typeof freight.capacity === "number" ? freight.capacity : null) ?? (typeof raw.capacity === "number" ? raw.capacity : null) ?? (raw.volume as number) ?? null,
     loading_meters: loadingMeters?.value ?? null,
     volume: (raw.volume as number) ?? null,
     truck_bodies: truckBodies,

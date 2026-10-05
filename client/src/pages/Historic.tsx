@@ -15,18 +15,18 @@ export default function HistoricPage() {
 
   return (
     <div>
-      <header className="flex justify-between items-end mb-6">
+      <header className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-end mb-6">
         <div>
           <div className="text-signal text-xs tracking-[0.18em] uppercase">Closed book</div>
-          <h1 className="font-display text-4xl">Historic / training</h1>
+          <h1 className="font-display text-3xl md:text-4xl">Historic / training</h1>
           <p className="text-mute mt-2 max-w-2xl">
             Archived freights, accepted proposals, and closed orders become JSONL samples for Anthropic pricing.
             Trans.eu exposes archived + accepted lists; there is no public full-exchange dump.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
           <button
-            className="bg-signal text-ink px-4 py-2 rounded-lg disabled:opacity-60"
+            className="bg-signal text-ink px-4 py-2.5 rounded-lg disabled:opacity-60 w-full sm:w-auto"
             disabled={busy}
             onClick={async () => {
               setBusy(true);
@@ -43,14 +43,31 @@ export default function HistoricPage() {
           >
             {busy ? "Pulling…" : "Pull from Trans.eu"}
           </button>
-          <a className="border border-line px-4 py-2 rounded-lg" href="/api/historic/export">
+          <a className="border border-line px-4 py-2.5 rounded-lg text-center w-full sm:w-auto" href="/api/historic/export">
             Download JSONL
           </a>
         </div>
       </header>
       {error && <p className="text-rust mb-3">{error}</p>}
       {data && (
-        <div className="bg-panel border border-line rounded-2xl overflow-hidden">
+        <>
+        <div className="md:hidden space-y-3">
+          {data.samples.map((s) => (
+            <article key={s.id} className="bg-panel border border-line rounded-2xl p-4">
+              <div className="mono text-sm text-signal">{s.source}</div>
+              <div className="uppercase mt-1">{s.route_key}</div>
+              <div className="text-sm text-mute mt-2">
+                {String(s.features.distance_km || "—")} km · {String(s.features.weight_t || "—")}t · pub{" "}
+                {money(s.features.published_price as number)}
+              </div>
+              <div className="mt-2">
+                {String(s.outcome.status)} {s.outcome.accepted_price ? `· ${money(s.outcome.accepted_price as number)}` : ""}
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden md:block bg-panel border border-line rounded-2xl overflow-hidden">
+          <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -76,7 +93,9 @@ export default function HistoricPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
+        </>
       )}
     </div>
   );

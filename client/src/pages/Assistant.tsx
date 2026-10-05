@@ -12,7 +12,7 @@ export default function Assistant() {
     <div>
       <header className="mb-6">
         <div className="text-signal text-xs tracking-[0.18em] uppercase">Calculations + copy</div>
-        <h1 className="font-display text-4xl">Anthropic desk</h1>
+        <h1 className="font-display text-3xl md:text-4xl">Anthropic desk</h1>
         <p className="text-mute mt-2 max-w-2xl">
           Uses live inbox, feed rules, and historic samples. If no API key is set, the server falls back to the local
           pricing heuristic.
@@ -36,7 +36,7 @@ export default function Assistant() {
         }}
       >
         <textarea className="w-full" rows={5} value={question} onChange={(e) => setQuestion(e.target.value)} />
-        <button className="mt-3 bg-signal text-ink px-4 py-2 rounded-lg" disabled={busy}>
+        <button className="mt-3 bg-signal text-ink px-4 py-2.5 rounded-lg w-full sm:w-auto" disabled={busy}>
           {busy ? "Thinking…" : "Ask the desk"}
         </button>
       </form>

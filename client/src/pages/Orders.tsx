@@ -11,10 +11,27 @@ export default function Orders() {
     <div>
       <header className="mb-6">
         <div className="text-signal text-xs tracking-[0.18em] uppercase">Won work</div>
-        <h1 className="font-display text-4xl">Orders</h1>
+        <h1 className="font-display text-3xl md:text-4xl">Orders</h1>
       </header>
       {error && <p className="text-rust">{error}</p>}
-      <div className="bg-panel border border-line rounded-2xl overflow-hidden">
+      <div className="md:hidden space-y-3">
+        {rows.map((row) => (
+          <article key={row.id} className="bg-panel border border-line rounded-2xl p-4">
+            <div className="flex justify-between gap-3">
+              <div className="mono text-signal">{row.number}</div>
+              <div className="text-sm text-mute">{row.status}</div>
+            </div>
+            <div className="mt-2">{row.loading_locality} → {row.unloading_locality}</div>
+            <div className="text-sm text-mute mt-1">{row.shipper_name} / {row.carrier_name}</div>
+            <div className="flex justify-between gap-3 mt-3 text-sm">
+              <span className="mono">{money(row.price, row.currency)}</span>
+              <span>{when(row.loading_at)}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="hidden md:block bg-panel border border-line rounded-2xl overflow-hidden">
+        <div className="table-wrap">
         <table>
           <thead>
             <tr>
@@ -39,6 +56,7 @@ export default function Orders() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

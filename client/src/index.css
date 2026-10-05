@@ -19,13 +19,19 @@ body {
   min-height: 100vh;
 }
 
+html, body {
+  overflow-x: hidden;
+}
+
 input, select, textarea {
   background: #141712;
   border: 1px solid #32382c;
   color: #efe8d6;
   border-radius: 8px;
-  padding: 0.45rem 0.65rem;
+  padding: 0.55rem 0.7rem;
   font: inherit;
+  font-size: 16px;
+  max-width: 100%;
 }
 
 input:focus, select:focus, textarea:focus {
@@ -37,9 +43,19 @@ button {
   font: inherit;
 }
 
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
+}
+
+.table-wrap table {
+  min-width: 36rem;
 }
 
 th {

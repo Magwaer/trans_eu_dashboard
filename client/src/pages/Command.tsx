@@ -20,13 +20,13 @@ export default function Command() {
 
   return (
     <div>
-      <header className="flex items-end justify-between mb-8">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6 md:mb-8">
         <div>
           <div className="text-signal text-xs tracking-[0.18em] uppercase">Live desk</div>
-          <h1 className="font-display text-4xl">Command</h1>
+          <h1 className="font-display text-3xl md:text-4xl">Command</h1>
         </div>
         <button
-          className="bg-signal text-ink px-4 py-2 rounded-lg font-medium disabled:opacity-60"
+          className="bg-signal text-ink px-4 py-2.5 rounded-lg font-medium disabled:opacity-60 w-full sm:w-auto"
           disabled={busy}
           onClick={async () => {
             setBusy(true);
@@ -47,7 +47,7 @@ export default function Command() {
       {error && <p className="text-rust mb-4">{error}</p>}
       {data && (
         <>
-          <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
             {[
               ["Watched feeds", data.feeds],
               ["Matched loads", data.freights.matched],
@@ -60,9 +60,10 @@ export default function Command() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             <section className="bg-panel border border-line rounded-2xl p-5">
               <h2 className="font-display text-2xl mb-3">Lanes in play</h2>
+              <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
@@ -83,6 +84,7 @@ export default function Command() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </section>
             <section className="bg-panel border border-line rounded-2xl p-5">
               <div className="flex justify-between items-center mb-3">

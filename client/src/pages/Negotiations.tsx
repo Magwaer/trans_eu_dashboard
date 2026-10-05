@@ -19,14 +19,67 @@ export default function Negotiations() {
     <div>
       <header className="mb-6">
         <div className="text-signal text-xs tracking-[0.18em] uppercase">Offers in motion</div>
-        <h1 className="font-display text-4xl">Negotiations</h1>
+        <h1 className="font-display text-3xl md:text-4xl">Negotiations</h1>
         <p className="text-mute mt-2 max-w-3xl">
           API negotiation works for direct, partner, and fixed-route offers. Public exchange counters still have to be
           finished on the Trans.eu platform — the desk still prices and drafts the reply.
         </p>
       </header>
       {error && <p className="text-rust mb-3">{error}</p>}
-      <div className="bg-panel border border-line rounded-2xl overflow-hidden">
+      <div className="md:hidden space-y-3">
+        {rows.map((row) => (
+          <article key={row.id} className="bg-panel border border-line rounded-2xl p-4 space-y-3">
+            <div>
+              <div>{row.loading_locality} → {row.unloading_locality}</div>
+              <div className="text-mute text-xs">{row.counterpart_name} · {row.feed_name || "unmatched"}</div>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="mono">{money(row.current_price, row.currency)}</span>
+              <span>{row.status}{row.auto_managed ? " · auto" : ""} · {row.rounds}r</span>
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                placeholder="Counter €"
+                value={open === row.id ? price : ""}
+                onChange={(e) => {
+                  setOpen(row.id);
+                  setPrice(e.target.value);
+                }}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  className="text-sm bg-signal text-ink px-2 py-2.5 rounded min-h-11"
+                  onClick={async () => {
+                    await api.negotiate(row.id, "counter", { price: Number(price), note: "Desk counter" });
+                    setPrice("");
+                    await load();
+                  }}
+                >
+                  Counter
+                </button>
+                <button
+                  className="text-sm border border-line px-2 py-2.5 rounded min-h-11"
+                  onClick={async () => {
+                    setOpen(row.id);
+                    const d = await api.negotiation(row.id);
+                    setEvents(d.events);
+                  }}
+                >
+                  History
+                </button>
+                <button className="text-sm border border-line px-2 py-2.5 rounded min-h-11" onClick={() => api.negotiate(row.id, "accept").then(load)}>
+                  Accept
+                </button>
+                <button className="text-sm border border-line px-2 py-2.5 rounded min-h-11" onClick={() => api.negotiate(row.id, "reject").then(load)}>
+                  Reject
+                </button>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="hidden md:block bg-panel border border-line rounded-2xl overflow-hidden">
+        <div className="table-wrap">
         <table>
           <thead>
             <tr>
@@ -90,12 +143,13 @@ export default function Negotiations() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
       {open && (
         <section className="mt-6 bg-panel border border-line rounded-2xl p-5">
           <h2 className="font-display text-2xl mb-3">Thread</h2>
           {events.map((ev) => (
-            <div key={ev.id} className="flex justify-between border-b border-line py-2 text-sm">
+            <div key={ev.id} className="flex flex-col sm:flex-row sm:justify-between gap-1 border-b border-line py-2 text-sm">
               <div>
                 <span className="text-signal">{ev.action}</span> · {ev.actor} · {ev.source}
                 <div className="text-mute">{ev.note}</div>

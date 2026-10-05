@@ -16,12 +16,12 @@ export default function Settings() {
     <div>
       <header className="mb-6">
         <div className="text-signal text-xs tracking-[0.18em] uppercase">Connections</div>
-        <h1 className="font-display text-4xl">Settings</h1>
+        <h1 className="font-display text-3xl md:text-4xl">Settings</h1>
       </header>
       {params.get("connected") && <p className="text-moss mb-3">Trans.eu connected.</p>}
       {error && <p className="text-rust mb-3">{error}</p>}
       {status && (
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <section className="bg-panel border border-line rounded-2xl p-5">
             <h2 className="font-display text-2xl">Trans.eu OAuth</h2>
             <p className="text-mute text-sm mt-2">

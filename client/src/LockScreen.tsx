@@ -21,13 +21,13 @@ export default function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
       <form
         onSubmit={submit}
-        className="w-full max-w-md bg-panel border border-line rounded-2xl p-8 shadow-lg"
+        className="w-full max-w-md bg-panel border border-line rounded-2xl p-6 sm:p-8 shadow-lg"
       >
         <div className="text-[11px] tracking-[0.22em] uppercase text-signal">TNL · Trans.eu</div>
-        <h1 className="font-display text-4xl mt-2">Lane Desk</h1>
+        <h1 className="font-display text-3xl sm:text-4xl mt-2">Lane Desk</h1>
         <p className="text-mute text-sm mt-2">Enter the dashboard password to unlock.</p>
         <label className="block mt-6 text-sm text-mute" htmlFor="desk-password">
           Password

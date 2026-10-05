@@ -7,6 +7,7 @@ import { pullHistoric, recentSyncs, syncLive } from "../services/sync.js";
 import { analyzeDesk, draftReply, suggestPrice } from "../services/anthropic.js";
 import { transEu } from "../services/transEuClient.js";
 import { getValidAccessToken } from "../services/transEuAuth.js";
+import { searchExchange } from "../services/exchangeSearch.js";
 
 export const apiRouter = Router();
 
@@ -186,6 +187,40 @@ apiRouter.patch("/feeds/:id", async (req, res) => {
 apiRouter.delete("/feeds/:id", async (req, res) => {
   await query("DELETE FROM feeds WHERE id = $1", [req.params.id]);
   res.json({ ok: true });
+});
+
+const exchangeSchema = z.object({
+  loading_country: z.string().optional(),
+  loading_locality: z.string().optional(),
+  loading_postal: z.string().optional(),
+  loading_range_km: nullableNum,
+  loading_lat: nullableNum,
+  loading_lng: nullableNum,
+  unloading_country: z.string().optional(),
+  unloading_locality: z.string().optional(),
+  date_from: z.string().optional(),
+  date_to: z.string().optional(),
+  truck_bodies: z.array(z.string()).optional(),
+  vehicle_sizes: z.array(z.string()).optional(),
+  max_weight_t: nullableNum,
+  max_length_m: nullableNum,
+  exclude_suspended: z.boolean().optional(),
+  sort_field: z.string().optional(),
+  sort_order: z.enum(["asc", "desc"]).optional(),
+  limit: optionalNum,
+});
+
+apiRouter.post("/exchange", async (req, res) => {
+  const parsed = exchangeSchema.safeParse(req.body || {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid exchange search", ...parsed.error.flatten() });
+    return;
+  }
+  try {
+    res.json(await searchExchange(parsed.data));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 apiRouter.get("/inbox", async (req, res) => {

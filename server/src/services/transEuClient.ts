@@ -49,11 +49,58 @@ function asItemList<T>(payload: unknown): T[] {
     return payload.filter((item) => isRecord(item) && item.id != null && item.id !== "") as T[];
   }
   if (isRecord(payload)) {
-    for (const key of ["orders", "freights", "freight_proposals", "items", "data", "results"]) {
+    if (isRecord(payload._embedded)) {
+      const embedded = asItemList<T>(payload._embedded);
+      if (embedded.length) return embedded;
+      for (const value of Object.values(payload._embedded)) {
+        const items = asItemList<T>(value);
+        if (items.length) return items;
+      }
+    }
+    for (const key of ["orders", "freights", "freight_proposals", "freight-offers", "items", "data", "results"]) {
       if (Array.isArray(payload[key])) return asItemList<T>(payload[key]);
     }
   }
   return [];
+}
+
+function responseTotal(payload: unknown, items: unknown[]) {
+  if (!isRecord(payload)) return items.length;
+  if (typeof payload.total === "number") return payload.total;
+  if (isRecord(payload.counters) && typeof payload.counters.all === "number") return payload.counters.all;
+  if (isRecord(payload.pagination) && typeof payload.pagination.total === "number") return payload.pagination.total;
+  return items.length;
+}
+
+async function requestExchange<T>(query: Query): Promise<T> {
+  const token = await getValidAccessToken();
+  if (!token) throw new Error("Trans.eu is not connected. Complete OAuth first.");
+  await apiLimiter.take();
+
+  const url = new URL("/app/exchange/api/rest/v2/freight-offers", config.trans.exchangeBase);
+  for (const [k, v] of Object.entries(query)) {
+    if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
+  }
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/hal+json, application/json",
+      Authorization: `Bearer ${token}`,
+      "Api-key": config.trans.apiKey,
+    },
+  });
+
+  if (res.status === 429) {
+    await new Promise((r) => setTimeout(r, 1000));
+    return requestExchange<T>(query);
+  }
+
+  const json = (await res.json().catch(() => ({}))) as T & { detail?: string; title?: string; message?: string; error?: string };
+  if (!res.ok) {
+    throw new Error(json.detail || json.message || json.error || json.title || `GET freight-offers failed (${res.status})`);
+  }
+  return json;
 }
 
 function isNotFound(err: unknown) {
@@ -116,4 +163,19 @@ export const transEu = {
     paginate("/ext/orders-api/v1/orders-received", { filter }),
   getArchivedCreatedOrders: () => paginate("/ext/orders-api/v1/archive-orders-created"),
   getArchivedReceivedOrders: () => paginate("/ext/orders-api/v1/archive-orders-received"),
+  searchFreightOffers: async (params: {
+    filter: Record<string, unknown>;
+    limit?: number;
+    sortField?: string;
+    sortOrder?: "asc" | "desc";
+  }) => {
+    const payload = await requestExchange<unknown>({
+      filter: JSON.stringify(params.filter),
+      pagination: JSON.stringify({ limit: params.limit ?? 100 }),
+      sort: JSON.stringify({ field: params.sortField || "index", order: params.sortOrder || "desc" }),
+      counters: JSON.stringify(["all"]),
+    });
+    const items = asItemList<Record<string, unknown>>(payload);
+    return { items, total: responseTotal(payload, items), raw: payload };
+  },
 };

@@ -24,6 +24,7 @@ export const config = {
       process.env.TRANS_TOKEN_URL ||
       "https://api.platform.trans.eu/ext/auth-api/accounts/token",
     apiBase: process.env.TRANS_API_BASE || "https://api.platform.trans.eu",
+    exchangeBase: process.env.TRANS_EXCHANGE_BASE || "https://api-platform.trans.eu",
     callbackUrl: process.env.TRANS_CALLBACK_URL || "",
   },
   anthropic: {
